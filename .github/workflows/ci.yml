@@ -9,16 +9,6 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    services:
-    mysql:
-      image: mysql:8.0.29
-      env:
-        MYSQL_ROOT_PASSWORD: tempdbpassword
-        MYSQL_DATABASE: pizza
-      ports:
-        - '3306:3306'
-      options: >-
-        --health-cmd "mysqladmin ping -ptempdbpassword" --health-interval 10s --health-start-period 10s --health-timeout 5s --health-retries 10
     outputs:
       version: ${{ steps.set_version.outputs.version }}
     steps:
@@ -30,33 +20,8 @@ jobs:
         with:
           node-version: '22.x'
 
-      - name: set version
-        id: set_version
-        run: |
-          version=$(date +'%Y%m%d.%H%M%S')
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          printf '{"version": "%s" }' "$version" > public/version.json
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Build
-        run: |
-          npm ci && npm run build
-          cp dist/index.html dist/404.html
-
-      - name: Update pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist/
-  deploy:
-    needs: build
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-# test.
+      - name: Lint
+        run: npm run lint
