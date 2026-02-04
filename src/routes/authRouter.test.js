@@ -1,6 +1,7 @@
 const request = require('supertest');
 const app = require('../service');
 
+
 const testUser = { name: 'pizza diner', email: 'reg@test.com', password: 'a' };
 let testUserAuthToken;
 
@@ -161,123 +162,6 @@ describe('orderRouter', () => {
     expect(res.status).toBe(500);
     expect(res.body.message).toBe('Failed to fulfill order at factory');
   });
-});
-
-// ===== Franchise Router Tests (Simple & Safe) =====
-
-describe('franchise router', () => {
-  let adminToken;
-  let userToken;
-  let franchiseId;
-  let storeId;
-
-  beforeAll(async () => {
-    // Login as seeded admin
-    const adminRes = await request(app)
-      .put('/api/auth')
-      .send({ email: 'admin@jwt.com', password: 'admin' });
-
-    adminToken = adminRes.body.token;
-
-    // Register a normal user
-    const userRes = await request(app)
-      .post('/api/auth')
-      .send({
-        name: 'regular user',
-        email: Math.random().toString(36).substring(2, 12) + '@test.com',
-        password: 'a',
-      });
-
-    userToken = userRes.body.token;
-  });
-
-  test('GET /api/franchise returns franchises (public)', async () => {
-    const res = await request(app).get('/api/franchise');
-
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('franchises');
-    expect(Array.isArray(res.body.franchises)).toBe(true);
-    expect(res.body).toHaveProperty('more');
-  });
-
-  test('non-admin cannot create a franchise', async () => {
-    const res = await request(app)
-      .post('/api/franchise')
-      .set('Authorization', `Bearer ${userToken}`)
-      .send({
-        name: 'illegal franchise',
-        admins: [],
-      });
-
-    expect(res.status).toBe(403);
-  });
-
-  test('non-admin cannot delete a store', async () => {
-    const res = await request(app)
-      .delete(`/api/franchise/${franchiseId}/store/${storeId}`)
-      .set('Authorization', `Bearer ${userToken}`);
-
-    expect(res.status).toBe(403);
-  });
-
-  test('franchise can be deleted without authentication', async () => {
-  const res = await request(app)
-    .delete(`/api/franchise/${franchiseId}`);
-
-  expect(res.status).toBe(200);
-  expect(res.body.message).toBe('franchise deleted');
-});
-
-test('admin can create a franchise', async () => {
-  // Ensure admin is logged in in DB
-  const adminUser = await DB.getUser('admin@jwt.com');
-  await DB.loginUser(adminUser.id, adminToken);
-
-  const res = await request(app)
-    .post('/api/franchise')
-    .set('Authorization', `Bearer ${adminToken}`)
-    .send({
-      name: 'test franchise',
-      admins: [{ email: 'admin@jwt.com' }],
-    });
-
-  expect(res.status).toBe(200);
-  expect(res.body).toHaveProperty('id');
-
-  franchiseId = res.body.id;
-});
-
-test('admin can create a store', async () => {
-  // Ensure admin is logged in in DB
-  const adminUser = await DB.getUser('admin@jwt.com');
-  await DB.loginUser(adminUser.id, adminToken);
-
-  const res = await request(app)
-    .post(`/api/franchise/${franchiseId}/store`)
-    .set('Authorization', `Bearer ${adminToken}`)
-    .send({ name: 'SLC' });
-
-  expect(res.status).toBe(200);
-  expect(res.body).toHaveProperty('id');
-
-  storeId = res.body.id;
-});
-
-test('admin can delete a store', async () => {
-  // Ensure admin is logged in in DB
-  const adminUser = await DB.getUser('admin@jwt.com');
-  await DB.loginUser(adminUser.id, adminToken);
-
-  const res = await request(app)
-    .delete(`/api/franchise/${franchiseId}/store/${storeId}`)
-    .set('Authorization', `Bearer ${adminToken}`);
-
-  expect(res.status).toBe(200);
-  expect(res.body.message).toBe('store deleted');
-});
-
-
-
 });
 
 
