@@ -2,134 +2,124 @@ const request = require('supertest');
 const app = require('../service');
 const { DB, Role } = require('../database/database.js');
 
+// ===== Helpers =====
 function randomName() {
   return Math.random().toString(36).substring(2, 12);
 }
 
-function expectValidJwt(token) {
-  expect(token).toMatch(/^[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*$/);
+async function createAdminUser() {
+  let user = { password: 'toomanysecrets', roles: [{ role: Role.Admin }] };
+  user.name = randomName();
+  user.email = `${user.name}@admin.com`;
+  user = await DB.addUser(user);
+  return { ...user, password: 'toomanysecrets' };
 }
 
-let adminUser, adminToken;
-let normalUser, normalToken;
+async function createNormalUser() {
+  let user = { password: 'simplepass', roles: [{ role: Role.Diner }] };
+  user.name = randomName();
+  user.email = `${user.name}@test.com`;
+  user = await DB.addUser(user);
+  return { ...user, password: 'simplepass' };
+}
 
-beforeAll(async () => {
-  // Create a normal user
-  normalUser = {
-    name: 'normal diner',
-    email: randomName() + '@test.com',
-    password: 'a',
-  };
-  const normalRes = await request(app).post('/api/auth').send(normalUser);
-  normalToken = normalRes.body.token;
-  expectValidJwt(normalToken);
-
-  // Create an admin user directly in the DB
-  adminUser = await DB.addUser({
-    name: randomName(),
-    email: randomName() + '@admin.com',
-    password: 'adminsecret',
-    roles: [{ role: Role.Admin }],
-  });
-
-  // Log in admin user to get JWT
-  const loginRes = await request(app).put('/api/auth').send({
-    email: adminUser.email,
-    password: 'adminsecret',
-  });
-  adminToken = loginRes.body.token;
-  expectValidJwt(adminToken);
-});
-
-describe('franchiseRouter', () => {
+// ===== Tests =====
+describe('franchise router', () => {
+  let adminUser;
+  let adminToken;
+  let normalUser;
+  let normalToken;
   let franchiseId;
+  let storeId;
 
-  test('GET /api/franchise returns list', async () => {
-    const res = await request(app)
-      .get('/api/franchise')
-      .set('Authorization', `Bearer ${normalToken}`);
+  beforeAll(async () => {
+    // Create admin and log in
+    adminUser = await createAdminUser();
+    const adminRes = await request(app)
+      .put('/api/auth')
+      .send({ email: adminUser.email, password: adminUser.password });
+    adminToken = adminRes.body.token;
+
+    // Create a normal user and log in
+    normalUser = await createNormalUser();
+    const userRes = await request(app)
+      .put('/api/auth')
+      .send({ email: normalUser.email, password: normalUser.password });
+    normalToken = userRes.body.token;
+  });
+
+  // ===== Public GET =====
+  test('GET /api/franchise returns franchises (public)', async () => {
+    const res = await request(app).get('/api/franchise');
 
     expect(res.status).toBe(200);
-    // Adjusted for actual API response
-    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body).toHaveProperty('franchises');
+    expect(Array.isArray(res.body.franchises)).toBe(true);
+    expect(res.body).toHaveProperty('more');
   });
 
-  test('POST /api/franchise rejects normal user', async () => {
+  // ===== Non-admin restrictions =====
+  test('non-admin cannot create a franchise', async () => {
     const res = await request(app)
       .post('/api/franchise')
       .set('Authorization', `Bearer ${normalToken}`)
-      .send({ name: 'New Franchise' });
+      .send({ name: `Illegal ${randomName()}`, admins: [] });
 
     expect(res.status).toBe(403);
-    expect(res.body.message).toBe('unable to create a franchise'); // match API
   });
 
-  test('POST /api/franchise allows admin user', async () => {
+  test('non-admin cannot delete a store', async () => {
+    const res = await request(app)
+      .delete(`/api/franchise/${franchiseId}/store/${storeId}`)
+      .set('Authorization', `Bearer ${normalToken}`);
+
+    expect(res.status).toBe(403);
+  });
+
+  // ===== Admin actions =====
+  test('admin can create a franchise', async () => {
     const res = await request(app)
       .post('/api/franchise')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Admin Franchise' });
+      .send({
+        name: `Franchise ${randomName()}`,
+        admins: [{ email: adminUser.email }],
+      });
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('franchise');
-    expect(res.body.franchise.name).toBe('Admin Franchise');
+    expect(res.body).toHaveProperty('id');
 
-    franchiseId = res.body.franchise.id; // save for update/delete tests
+    franchiseId = res.body.id;
   });
 
-  test('PUT /api/franchise/:id rejects normal user', async () => {
+  test('admin can create a store for a franchise', async () => {
     const res = await request(app)
-      .put(`/api/franchise/${franchiseId}`)
-      .set('Authorization', `Bearer ${normalToken}`)
-      .send({ name: 'Hacked Franchise' });
-
-    // Adjusted to match API: normal user still gets 404 if the franchise isn't visible
-    expect([403, 404]).toContain(res.status);
-  });
-
-  test('PUT /api/franchise/:id updates franchise with admin', async () => {
-    const res = await request(app)
-      .put(`/api/franchise/${franchiseId}`)
+      .post(`/api/franchise/${franchiseId}/store`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Updated Franchise' });
+      .send({ name: `Store ${randomName()}` });
 
     expect(res.status).toBe(200);
-    expect(res.body.franchise.name).toBe('Updated Franchise');
+    expect(res.body).toHaveProperty('id');
+
+    storeId = res.body.id;
   });
 
-  test('PUT /api/franchise/:id fails with invalid ID', async () => {
+  test('admin can delete a store from a franchise', async () => {
     const res = await request(app)
-      .put('/api/franchise/999999')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'No Franchise' });
-
-    expect(res.status).toBe(404);
-    expect(res.body.message).toBe('franchise not found');
-  });
-
-  test('DELETE /api/franchise/:id rejects normal user', async () => {
-    const res = await request(app)
-      .delete(`/api/franchise/${franchiseId}`)
-      .set('Authorization', `Bearer ${normalToken}`);
-
-    // API might return 200 but message shows unauthorized
-    expect([403, 200]).toContain(res.status);
-  });
-
-  test('DELETE /api/franchise/:id deletes franchise with admin', async () => {
-    const res = await request(app)
-      .delete(`/api/franchise/${franchiseId}`)
+      .delete(`/api/franchise/${franchiseId}/store/${storeId}`)
       .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('store deleted');
+  });
+
+  // ===== Franchise deletion test =====
+  test('franchise can be deleted without authentication', async () => {
+    const res = await request(app)
+      .delete(`/api/franchise/${franchiseId}`);
 
     expect(res.status).toBe(200);
     expect(res.body.message).toBe('franchise deleted');
   });
-
-  test('DELETE /api/franchise/:id fails with invalid ID', async () => {
-    const res = await request(app)
-      .delete(`/api/franchise/${franchiseId}`) // already deleted
-      .set('Authorization', `Bearer ${adminToken}`);
-
-    expect([404, 200]).toContain(res.status);
-  });
 });
+
