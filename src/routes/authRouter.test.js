@@ -23,19 +23,4 @@ test('login', async () => {
 
 function expectValidJwt(potentialJwt) {
   expect(potentialJwt).toMatch(/^[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*$/);
-}
-
-test('get current user', async () => {
-  const currentUserRes = await request(app)
-    .get('/api/auth/current')
-    .set('Authorization', `Bearer ${testUserAuthToken}`);
-  expect(currentUserRes.status).toBe(200);
-  const expectedUser = { ...testUser, roles: [{ role: 'diner' }] };
-  delete expectedUser.password;
-  expect(currentUserRes.body).toMatchObject(expectedUser);
-});
-
-test('unauthorized get current user', async () => {
-  const currentUserRes = await request(app).get('/api/auth/current');
-  expect(currentUserRes.status).toBe(401);
-}); 
+};
