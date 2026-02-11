@@ -65,6 +65,9 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           printf '{"version": "%s" }' "$version" > src/version.json
 
+      - name: Install coverage tools
+        run: sudo apt-get update && sudo apt-get install -y jq bc
+
       - name: Update coverage
         run: |
           coverage=$(jq '.total.lines.pct' coverage/coverage-summary.json)
