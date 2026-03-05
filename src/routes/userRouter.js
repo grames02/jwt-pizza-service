@@ -8,11 +8,20 @@ const userRouter = express.Router();
 userRouter.docs = [
   {
     method: 'GET',
-    path: '/api/user/me',
+    path: '/api/user?page=1&limit=10&name=*',
     requiresAuth: true,
-    description: 'Get authenticated user',
-    example: `curl -X GET localhost:3000/api/user/me -H 'Authorization: Bearer tttttt'`,
-    response: { id: 1, name: '常用名字', email: 'a@jwt.com', roles: [{ role: 'admin' }] },
+    description: 'Gets a list of users',
+    example: `curl -X GET localhost:3000/api/user -H 'Authorization: Bearer tttttt'`,
+    response: {
+      users: [
+        {
+          id: 1,
+          name: '常用名字',
+          email: 'a@jwt.com',
+          roles: [{ role: 'admin' }],
+        },
+      ],
+    },
   },
   {
     method: 'PUT',
@@ -23,7 +32,6 @@ userRouter.docs = [
     response: { user: { id: 1, name: '常用名字', email: 'a@jwt.com', roles: [{ role: 'admin' }] }, token: 'tttttt' },
   },
 ];
-
 // getUser
 userRouter.get(
   '/me',
@@ -51,21 +59,50 @@ userRouter.put(
   })
 );
 
-// deleteUser
+// DELETE /api/user/:userId - Admin only
 userRouter.delete(
   '/:userId',
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
-    res.json({ message: 'not implemented' });
+    const currentUser = req.user;
+
+    // Only admins can delete users
+    if (!currentUser.isRole(Role.Admin)) {
+      return res.status(403).json({ message: 'unauthorized' });
+    }
+
+    const userId = Number(req.params.userId);
+
+    // Prevent self-deletion
+    if (currentUser.id === userId) {
+      return res.status(400).json({ message: "Admins cannot delete themselves" });
+    }
+
+    await DB.deleteUser(userId);
+    res.json({ message: 'User deleted successfully' });
   })
 );
 
-// listUsers
+// GET /api/user - List users (Admin only) with pagination and optional name filter
 userRouter.get(
   '/',
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
-    res.json({ message: 'not implemented', users: [], more: false });
+    const currentUser = req.user;
+
+    // Only admins can list users
+    if (!currentUser.isRole(Role.Admin)) {
+      return res.status(403).json({ message: 'unauthorized' });
+    }
+
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const nameFilter = req.query.name || '*';
+
+    // Fetch users and pagination info from DB
+    const [users, more] = await DB.getUsers(page, limit, nameFilter);
+
+    res.json({ users, more });
   })
 );
 

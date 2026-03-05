@@ -346,7 +346,7 @@ class DB {
 
         if (!dbExists) {
           const defaultAdmin = { name: '常用名字', email: 'a@jwt.com', password: 'admin', roles: [{ role: Role.Admin }] };
-          this.addUser(defaultAdmin);
+          await this.addUser(defaultAdmin);
         }
       } finally {
         connection.end();
@@ -360,7 +360,57 @@ class DB {
     const [rows] = await connection.execute(`SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?`, [config.db.connection.database]);
     return rows.length > 0;
   }
+
+  async getUsers(page = 1, limit = 10, nameFilter = '*') {
+  const connection = await this.getConnection();
+  nameFilter = nameFilter.replace(/\*/g, '%');
+
+  const pageNum = Number(page) || 1;
+  const limitNum = Number(limit) || 10;
+  const offset = (pageNum - 1) * limitNum;
+
+  try {
+    // Get users
+    let users = await this.query(
+      connection,
+      `SELECT id, name, email FROM user WHERE name LIKE ? LIMIT ? OFFSET ?`,
+      [nameFilter, limitNum + 1, offset]
+    );
+
+    // Check if there are more users for pagination
+    const more = users.length > limitNum;
+    if (more) users = users.slice(0, limitNum);
+
+    // Attach roles for each user
+    for (const u of users) {
+      const roles = await this.query(
+        connection,
+        `SELECT role, objectId FROM userRole WHERE userId=?`,
+        [u.id]
+      );
+      u.roles = Array.isArray(roles) ? roles.map(r => ({ role: r.role, objectId: r.objectId })) : [];
+    }
+
+    return [users, more];
+  } finally {
+    connection.end();
+  }
 }
+
+  // Delete a user safely
+  async deleteUser(userId) {
+    const connection = await this.getConnection();
+    try {
+      // Remove all roles first to avoid foreign key issues
+      await this.query(connection, `DELETE FROM userRole WHERE userId=?`, [userId]);
+      // Remove the user
+      await this.query(connection, `DELETE FROM user WHERE id=?`, [userId]);
+    } finally {
+      connection.end();
+    }
+  }
+}
+
 
 const db = new DB();
 module.exports = { Role, DB: db };

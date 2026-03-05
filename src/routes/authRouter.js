@@ -33,20 +33,27 @@ authRouter.docs = [
 
 async function setAuthUser(req, res, next) {
   const token = readAuthToken(req);
+
   if (token) {
     try {
       if (await DB.isLoggedIn(token)) {
-        // Check the database to make sure the token is valid.
-        req.user = jwt.verify(token, config.jwtSecret);
-        req.user.isRole = (role) => !!req.user.roles.find((r) => r.role === role);
+        const decoded = jwt.verify(token, config.jwtSecret);
+
+        // Ensure roles always exists
+        decoded.roles = Array.isArray(decoded.roles) ? decoded.roles : [];
+
+        decoded.isRole = (role) =>
+          decoded.roles.some((r) => r.role === role);
+
+        req.user = decoded;
       }
     } catch {
       req.user = null;
     }
   }
+
   next();
 }
-
 // Authenticate token
 authRouter.authenticateToken = (req, res, next) => {
   if (!req.user) {
