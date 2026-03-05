@@ -63,7 +63,7 @@ jobs:
           printf '{"version": "%s" }' "$version" > src/version.json
 
       - name: Create dist
-        workinhg-directory: jwt-pizza-service
+        working-directory: jwt-pizza-service
         run: |
           mkdir dist
           cp Dockerfile dist
