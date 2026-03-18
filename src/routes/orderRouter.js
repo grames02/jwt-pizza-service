@@ -1,4 +1,5 @@
 const express = require('express');
+const metrics = require('../metrics.js');
 const config = require('../config.js');
 const { Role, DB } = require('../database/database.js');
 const { authRouter } = require('./authRouter.js');
