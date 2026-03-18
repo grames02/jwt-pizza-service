@@ -15,7 +15,6 @@ class Metrics {
         next();
     }
     
-    
     recordAuth(success) {
         if (success) {
             this.authAttempts.success += 1;
