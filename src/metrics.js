@@ -7,6 +7,12 @@ class Metrics {
     this.httpRequests = {};
     this.authAttempts = { success: 0, failure: 0 };
     this.pizzaPurchases = { success: 0, failure: 0, totalRevenue: 0 };
+    console.log('--- METRICS CONFIG ---');
+    console.log('Endpoint:', config.metrics.endpointUrl);
+    console.log('Source:', config.metrics.source);
+    console.log('Account ID:', config.metrics.accountId ? 'SET' : 'MISSING');
+    console.log('API Key:', config.metrics.apiKey ? 'SET' : 'MISSING');
+    console.log('----------------------');
 
     // Bind methods to preserve `this`
     this.requestTracker = this.requestTracker.bind(this);
@@ -68,6 +74,7 @@ class Metrics {
 
   // Send metrics to Grafana
   async sendToGrafana() {
+    console.log('\n[Metrics] sendToGrafana triggered at', new Date().toISOString());
     const timestamp = Date.now() * 1_000_000; // nanoseconds
 
     const formatAttributes = (attrs) => {
@@ -162,6 +169,8 @@ class Metrics {
 
     try {
       console.log('Sending payload to Grafana...');
+      console.log('[Metrics] Payload preview:');
+      console.dir(body, { depth: null });
       const res = await fetch(config.metrics.endpointUrl, {
         method: 'POST',
         headers: {
