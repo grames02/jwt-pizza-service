@@ -9,8 +9,6 @@ const config = require('./config.js');
 
 const app = express();
 app.use(express.json());
-app.use(setAuthUser);
-app.use(metrics.requestTracker);
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
@@ -18,6 +16,7 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   next();
 });
+app.use(metrics.requestTracker);
 
 const apiRouter = express.Router();
 app.use('/api', apiRouter);

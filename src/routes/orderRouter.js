@@ -1,5 +1,6 @@
 const express = require('express');
 const config = require('../config.js');
+const metrics = require('../metrics.js');
 const { Role, DB } = require('../database/database.js');
 const { authRouter } = require('./authRouter.js');
 const { asyncHandler, StatusCodeError } = require('../endpointHelper.js');
@@ -90,6 +91,7 @@ orderRouter.post(
     } else {
       res.status(500).send({ message: 'Failed to fulfill order at factory', followLinkToEndChaos: j.reportUrl });
     }
+    
   })
 );
 
