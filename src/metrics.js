@@ -139,7 +139,7 @@ class Metrics {
 
     // CPU usage
     metrics.push({
-        name: 'cpu_usage_percentage',
+        name: 'cpu_percent',
         gauge: {
             dataPoints: [{
                 doubleValue: parseFloat(this.getCpuUsagePercentage()),

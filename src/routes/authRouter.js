@@ -1,10 +1,48 @@
 const express = require('express');
+const metrics = require('../metrics.js');
 const jwt = require('jsonwebtoken');
 const config = require('../config.js');
 const { asyncHandler } = require('../endpointHelper.js');
 const { DB, Role } = require('../database/database.js');
 
 const authRouter = express.Router();
+
+// register
+authRouter.post(
+  '/',
+  asyncHandler(async (req, res) => {
+    const { name, email, password } = req.body;
+    if (!name || !email || !password) {
+      metrics.recordAuth(false); // record failed attempt
+      return res.status(400).json({ message: 'name, email, and password are required' });
+    }
+    try {
+      const user = await DB.addUser({ name, email, password, roles: [{ role: Role.Diner }] });
+      const auth = await setAuth(user);
+      metrics.recordAuth(true); // success
+      res.json({ user: user, token: auth });
+    } catch (err) {
+      metrics.recordAuth(false); // failed due to DB or other error
+      throw err;
+    }
+  })
+);
+
+// login
+authRouter.put(
+  '/',
+  asyncHandler(async (req, res) => {
+    const { email, password } = req.body;
+    const user = await DB.getUser(email, password);
+    if (!user) {
+      metrics.recordAuth(false); // login failed
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+    const auth = await setAuth(user);
+    metrics.recordAuth(true); // login success
+    res.json({ user: user, token: auth });
+  })
+);
 
 authRouter.docs = [
   {
