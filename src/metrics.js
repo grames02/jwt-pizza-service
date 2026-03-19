@@ -45,73 +45,151 @@ class Metrics {
     }
     
     async sendToGrafana() {
-        const timestamp = Date.now() * 1_000_000;
-        const payload = {
-            resourceMetrics: [{
-                scopeMetrics: [{
-                    metrics: [
-                        {
-                            name: 'http_requests_total',
-                            gauge: {
-                                dataPoints: Object.entries(this.httpRequests).map(([method, count]) => ({
-                                    attributes: { method },
-                                    asInt: count,
-                                    timeUnixNano: timestamp.toString(),
-                                })),
-                            },
-                        },
-                        {
-                            name: 'auth_attempts_total',
-                            gauge: {
-                                dataPoints: [
-                                    { attributes: { outcome: 'success' }, asInt: this.authAttempts.success, timeUnixNano: timestamp.toString() },
-                                    { attributes: { outcome: 'failure' }, asInt: this.authAttempts.failure, timeUnixNano: timestamp.toString() },
-                                ],
-                            },
-                        },
-                        {
-                            name: 'pizza_purchases_total',
-                            gauge: {
-                                dataPoints: [
-                                    { attributes: { outcome: 'success' }, asInt: this.pizzaPurchases.success, timeUnixNano: timestamp.toString() },
-                                    { attributes: { outcome: 'failure' }, asInt: this.pizzaPurchases.failure, timeUnixNano: timestamp.toString() },
-                                    { attributes: { outcome: 'revenue' }, asDouble: this.pizzaPurchases.totalRevenue, timeUnixNano: timestamp.toString() },
-                                ],
-                            },
-                        },
-                        {
-                            name: 'memory_usage_percentage',
-                            gauge: {
-                                dataPoints: [ { asDouble: parseFloat(this.getMemoryUsagePercentage()), timeUnixNano: timestamp.toString() } ],
-                            },
-                        },
-                        {
-                            name: 'cpu_usage_percentage',
-                            gauge: {
-                                dataPoints: [ { asDouble: parseFloat(this.getCpuUsagePercentage()), timeUnixNano: timestamp.toString() } ],
-                            },
-                        },
-                    ],
-                }],
-            }],
-        };  
+    const timestamp = Date.now() * 1_000_000; // nanoseconds
 
-        try {
-            const auth = `${config.metrics.accountId}:${config.metrics.apiKey}`;
-            await fetch(config.metrics.endpointUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Basic ` + Buffer.from(auth).toString('base64'),},
-                body: JSON.stringify(payload),
-            });
-            this.httpRequests = {};
-            this.authAttempts = {success: 0, failure: 0};
-            this.pizzaPurchases = {success: 0, failure: 0, totalRevenue: 0};
-        } catch (error) {
-            console.log('Error sending metrics to Grafana', error);
+    // Helper to format attributes correctly for OTLP
+    const formatAttributes = (attrs) => {
+        const arr = [];
+        for (const key in attrs) {
+            const value = attrs[key];
+            if (typeof value === 'string') arr.push({ key, value: { stringValue: value } });
+            else if (typeof value === 'number' && Number.isInteger(value)) arr.push({ key, value: { intValue: value } });
+            else if (typeof value === 'number') arr.push({ key, value: { doubleValue: value } });
+            else arr.push({ key, value: { stringValue: String(value) } }); // fallback
         }
+        return arr;
+    };
+
+    // Build metrics array
+    const metrics = [];
+
+    // HTTP requests
+    Object.entries(this.httpRequests).forEach(([method, count]) => {
+        metrics.push({
+            name: 'http_requests_total',
+            sum: {
+                dataPoints: [{
+                    asInt: count,
+                    timeUnixNano: timestamp.toString(),
+                    attributes: formatAttributes({ method, source: config.metrics.source })
+                }],
+                aggregationTemporality: 'AGGREGATION_TEMPORALITY_CUMULATIVE',
+                isMonotonic: true,
+            }
+        });
+    });
+
+    // Auth attempts
+    ['success', 'failure'].forEach(outcome => {
+        metrics.push({
+            name: 'auth_attempts_total',
+            sum: {
+                dataPoints: [{
+                    asInt: this.authAttempts[outcome],
+                    timeUnixNano: timestamp.toString(),
+                    attributes: formatAttributes({ outcome, source: config.metrics.source })
+                }],
+                aggregationTemporality: 'AGGREGATION_TEMPORALITY_CUMULATIVE',
+                isMonotonic: true,
+            }
+        });
+    });
+
+    // Pizza purchases
+    ['success', 'failure'].forEach(outcome => {
+        metrics.push({
+            name: 'pizza_purchases_total',
+            sum: {
+                dataPoints: [{
+                    asInt: this.pizzaPurchases[outcome],
+                    timeUnixNano: timestamp.toString(),
+                    attributes: formatAttributes({ outcome, source: config.metrics.source })
+                }],
+                aggregationTemporality: 'AGGREGATION_TEMPORALITY_CUMULATIVE',
+                isMonotonic: true,
+            }
+        });
+    });
+
+    // Total revenue
+    metrics.push({
+        name: 'pizza_revenue_total',
+        sum: {
+            dataPoints: [{
+                doubleValue: this.pizzaPurchases.totalRevenue,
+                timeUnixNano: timestamp.toString(),
+                attributes: formatAttributes({ source: config.metrics.source })
+            }],
+            aggregationTemporality: 'AGGREGATION_TEMPORALITY_CUMULATIVE',
+            isMonotonic: true,
+        }
+    });
+
+    // Memory usage
+    metrics.push({
+        name: 'memory_usage_percentage',
+        gauge: {
+            dataPoints: [{
+                doubleValue: parseFloat(this.getMemoryUsagePercentage()),
+                timeUnixNano: timestamp.toString(),
+                attributes: formatAttributes({ source: config.metrics.source })
+            }]
+        }
+    });
+
+    // CPU usage
+    metrics.push({
+        name: 'cpu_usage_percentage',
+        gauge: {
+            dataPoints: [{
+                doubleValue: parseFloat(this.getCpuUsagePercentage()),
+                timeUnixNano: timestamp.toString(),
+                attributes: formatAttributes({ source: config.metrics.source })
+            }]
+        }
+    });
+
+    // Build the OTLP payload
+    const body = {
+        resourceMetrics: [
+            {
+                scopeMetrics: [
+                    { metrics }
+                ]
+            }
+        ]
+    };
+
+    try {
+        console.log('Sending payload to Grafana:', JSON.stringify(body, null, 2));
+
+        const res = await fetch(config.metrics.endpointUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Basic ${Buffer.from(`${config.metrics.accountId}:${config.metrics.apiKey}`).toString('base64')}`
+            },
+            body: JSON.stringify(body)
+        });
+
+        const text = await res.text();
+        console.log('Grafana response status:', res.status);
+        console.log('Grafana response body:', text);
+
+        if (res.ok) {
+            // Reset counters only on success
+            this.httpRequests = {};
+            this.authAttempts = { success: 0, failure: 0 };
+            this.pizzaPurchases = { success: 0, failure: 0, totalRevenue: 0 };
+        } else {
+            console.warn('Metrics not accepted by Grafana, counters not reset.');
+        }
+    } catch (err) {
+        console.error('Error sending metrics to Grafana:', err);
     }
+}
+
+       
     startPeriodicReporting(interval) {
         setInterval(() => this.sendToGrafana(), interval);
     }
