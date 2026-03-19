@@ -205,5 +205,6 @@ class Metrics {
 
 const metrics = new Metrics();
 metrics.startPeriodicReporting(5000);
+metrics.sendToGrafana();
 
 module.exports = metrics;
