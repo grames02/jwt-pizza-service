@@ -58,11 +58,9 @@ jobs:
               source: 'jwt-pizza-service',
               endpointUrl: '${{ secrets.METRICS_ENDPOINT_URL }}',
               apiKey: '${{ secrets.METRICS_API_KEY }}',
-              accountId: '${{ secrets.METRICS_ACCOUNT_ID_KEY }}',
+              accountId: '${{ secrets.METRICS_ACCOUNT_ID }}',
             },            
           };" > src/config.js
-      # With this section above, am I actually running my metrics file? Or why hasn't it been running whenever I push?
-      # Something for me to review...
 
       - name: set version
         id: set_version
