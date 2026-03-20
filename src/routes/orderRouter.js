@@ -5,6 +5,7 @@ const { Role, DB } = require('../database/database.js');
 const { authRouter } = require('./authRouter.js');
 const { asyncHandler, StatusCodeError } = require('../endpointHelper.js');
 
+const app = express();
 const orderRouter = express.Router();
 
 orderRouter.docs = [
