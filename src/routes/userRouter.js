@@ -2,6 +2,7 @@ const express = require('express');
 const { asyncHandler } = require('../endpointHelper.js');
 const { DB, Role } = require('../database/database.js');
 const { authRouter, setAuth } = require('./authRouter.js');
+const { metrics } = require('../config.js');
 
 const userRouter = express.Router();
 
@@ -50,8 +51,10 @@ userRouter.put(
     const userId = Number(req.params.userId);
     const user = req.user;
     if (user.id !== userId && !user.isRole(Role.Admin)) {
+      metrics.recordAuth(false);
       return res.status(403).json({ message: 'unauthorized' });
     }
+    metrics.recordAuth(true);
 
     const updatedUser = await DB.updateUser(userId, name, email, password);
     const auth = await setAuth(updatedUser);
@@ -68,8 +71,10 @@ userRouter.delete(
 
     // Only admins can delete users
     if (!currentUser.isRole(Role.Admin)) {
+      metrics.recordAuth(false);
       return res.status(403).json({ message: 'unauthorized' });
     }
+      metrics.recordAuth(true);
 
     const userId = Number(req.params.userId);
 
@@ -92,8 +97,10 @@ userRouter.get(
 
     // Only admins can list users
     if (!currentUser.isRole(Role.Admin)) {
+      metrics.recordAuth(false);
       return res.status(403).json({ message: 'unauthorized' });
     }
+    metrics.recordAuth(true);
 
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;

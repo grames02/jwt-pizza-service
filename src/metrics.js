@@ -56,176 +56,176 @@ class Metrics {
     return ((usedMemory / totalMemory) * 100).toFixed(2);
   }
 
-  // CPU usage percentage (works cross-platform)
   getCpuUsagePercentage() {
-    // Windows doesn't support loadavg; fallback to CPU time calculation
-    if (os.loadavg().every((n) => n === 0)) {
-      const cpus = os.cpus();
-      let totalIdle = 0, totalTick = 0;
+  const cpus = os.cpus();
+  if (!cpus || !cpus.length) return 0;
 
-      cpus.forEach((cpu) => {
-        for (const type in cpu.times) {
-          totalTick += cpu.times[type];
-        }
-        totalIdle += cpu.times.idle;
-      });
-
-      const usage = 1 - totalIdle / totalTick;
-      return (usage * 100).toFixed(2);
-    } else {
-      // Use loadavg for Unix
-      const usage = os.loadavg()[0] / os.cpus().length;
-      return (usage * 100).toFixed(2);
-    }
+  // Use loadavg for Unix if supported
+  const loadavg = os.loadavg();
+  if (loadavg.some(n => n > 0)) {
+    const usage = loadavg[0] / cpus.length;
+    return (usage * 100).toFixed(2);
   }
 
-  // Send metrics to Grafana
+  // Fallback for Windows: calculate CPU usage manually
+  let totalIdle = 0, totalTick = 0;
+  cpus.forEach(cpu => {
+    for (const type in cpu.times) totalTick += cpu.times[type];
+    totalIdle += cpu.times.idle;
+  });
+
+  const usage = 1 - totalIdle / totalTick;
+  return (usage * 100).toFixed(2);
+}
+
   async sendToGrafana() {
-    console.log('\n[Metrics] sendToGrafana triggered at', new Date().toISOString());
-    const timestamp = Date.now() * 1_000_000; // nanoseconds
+  console.log('\n[Metrics] sendToGrafana triggered at', new Date().toISOString());
+  const timestamp = Date.now() * 1_000_000; // convert ms → ns
 
-    const formatAttributes = (attrs) => {
-      const arr = [];
-      for (const key in attrs) {
-        const value = attrs[key];
-        if (typeof value === 'string') arr.push({ key, value: { stringValue: value } });
-        else if (typeof value === 'number' && Number.isInteger(value)) arr.push({ key, value: { intValue: value } });
-        else if (typeof value === 'number') arr.push({ key, value: { doubleValue: value } });
-        else arr.push({ key, value: { stringValue: String(value) } });
+  const formatAttributes = (attrs) => {
+    const arr = [];
+    for (const key in attrs) {
+      const value = attrs[key];
+      if (typeof value === 'string') arr.push({ key, value: { stringValue: value } });
+      else if (typeof value === 'number' && Number.isInteger(value)) arr.push({ key, value: { intValue: value } });
+      else if (typeof value === 'number') arr.push({ key, value: { doubleValue: value } });
+      else arr.push({ key, value: { stringValue: String(value) } });
+    }
+    return arr;
+  };
+
+  const metricsPayload = [];
+
+  // --- HTTP requests ---
+  Object.entries(this.httpRequests).forEach(([method, data]) => {
+    if (!data.latency.length) return;
+    const avgLatency = data.latency.reduce((a, b) => a + b, 0) / data.latency.length;
+    metricsPayload.push({
+      name: 'http_latency_ms',
+      gauge: {
+        dataPoints: [
+          { doubleValue: avgLatency, timeUnixNano: timestamp.toString(), attributes: formatAttributes({ method, source: config.metrics.source }) }
+        ]
       }
-      return arr;
-    };
-
-    const metrics = [];
-
-    // HTTP requests
-    // Latency per method
-    Object.entries(this.httpRequests).forEach(([method, data]) => {
-      if (!data.latency.length) return;
-      const avgLatency = data.latency.reduce((a,b) => a+b,0)/data.latency.length;
-      metrics.push({
-        name: 'http_latency_ms',
-        gauge: {
-          dataPoints: [
-            { doubleValue: avgLatency, timeUnixNano: timestamp.toString(), attributes: formatAttributes({ method, source: config.metrics.source }) }
-          ]
-        }
-      });
     });
+  });
 
-    // Auth attempts
-    ['success', 'failure'].forEach(outcome => {
-      metrics.push({
-        name: 'auth_attempts_total',
-        sum: {
-          dataPoints: [
-            { asInt: this.authAttempts[outcome], timeUnixNano: timestamp.toString(), attributes: formatAttributes({ outcome, source: config.metrics.source }) }
-          ],
-          aggregationTemporality: 'AGGREGATION_TEMPORALITY_CUMULATIVE',
-          isMonotonic: true,
-        }
-      });
-    });
-
-    // Pizza purchases
-    ['success', 'failure'].forEach(outcome => {
-      metrics.push({
-        name: 'pizza_purchases_total',
-        sum: {
-          dataPoints: [
-            { asInt: this.pizzaPurchases[outcome], timeUnixNano: timestamp.toString(), attributes: formatAttributes({ outcome, source: config.metrics.source }) }
-          ],
-          aggregationTemporality: 'AGGREGATION_TEMPORALITY_CUMULATIVE',
-          isMonotonic: true,
-        }
-      });
-    });
-
-    // Total revenue
-    metrics.push({
-      name: 'pizza_revenue_total',
+  // --- Auth attempts ---
+  ['success', 'failure'].forEach(outcome => {
+    metricsPayload.push({
+      name: 'auth_attempts_total',
       sum: {
         dataPoints: [
-          { doubleValue: this.pizzaPurchases.totalRevenue, timeUnixNano: timestamp.toString(), attributes: formatAttributes({ source: config.metrics.source }) }
+          { asInt: this.authAttempts[outcome], timeUnixNano: timestamp.toString(), attributes: formatAttributes({ outcome, source: config.metrics.source }) }
         ],
         aggregationTemporality: 'AGGREGATION_TEMPORALITY_CUMULATIVE',
         isMonotonic: true,
       }
     });
+  });
 
-    // Memory usage
-    metrics.push({
-      name: 'memory_usage_percentage',
-      gauge: {
+  // --- Pizza purchases ---
+  ['success', 'failure'].forEach(outcome => {
+    metricsPayload.push({
+      name: 'pizza_purchases_total',
+      sum: {
         dataPoints: [
-          { doubleValue: parseFloat(this.getMemoryUsagePercentage()), timeUnixNano: timestamp.toString(), attributes: formatAttributes({ source: config.metrics.source }) }
-        ]
+          { asInt: this.pizzaPurchases[outcome], timeUnixNano: timestamp.toString(), attributes: formatAttributes({ outcome, source: config.metrics.source }) }
+        ],
+        aggregationTemporality: 'AGGREGATION_TEMPORALITY_CUMULATIVE',
+        isMonotonic: true,
       }
     });
+  });
 
-    // CPU usage
-    metrics.push({
-      name: 'cpu_percent',
-      gauge: {
-        dataPoints: [
-          { doubleValue: parseFloat(this.getCpuUsagePercentage()), timeUnixNano: timestamp.toString(), attributes: formatAttributes({ source: config.metrics.source }) }
-        ]
+  metricsPayload.push({
+    name: 'pizza_revenue_total',
+    sum: {
+      dataPoints: [
+        { doubleValue: this.pizzaPurchases.totalRevenue, timeUnixNano: timestamp.toString(), attributes: formatAttributes({ source: config.metrics.source }) }
+      ],
+      aggregationTemporality: 'AGGREGATION_TEMPORALITY_CUMULATIVE',
+      isMonotonic: true,
+    }
+  });
+
+  // --- Memory usage ---
+  metricsPayload.push({
+    name: 'memory_usage_percentage',
+    gauge: {
+      dataPoints: [
+        { doubleValue: parseFloat(this.getMemoryUsagePercentage()), timeUnixNano: timestamp.toString(), attributes: formatAttributes({ source: config.metrics.source }) }
+      ]
+    }
+  });
+
+  // --- CPU usage ---
+metricsPayload.push({
+  name: 'cpu',
+  unit: '%',
+  gauge: {
+    dataPoints: [
+      {
+        doubleValue: parseFloat(this.getCpuUsagePercentage()),
+        timeUnixNano: timestamp.toString(),
+        attributes: formatAttributes({ source: config.metrics.source })
       }
-    });
+    ]
+  }
+});
 
-    const body = {
+  // --- Wrap everything in resourceMetrics structure ---
+  const body = {
     resourceMetrics: [
       {
         resource: {
           attributes: [
-            {
-              key: "service.name",
-              value: { stringValue: config.metrics.source }
-            }
+            { key: 'service.name', value: { stringValue: config.metrics.source } }
           ]
         },
         scopeMetrics: [
           {
-            scope: { name: "pizza-metrics" },
-            metrics: metrics
+            scope: { name: 'pizza-metrics' },
+            metrics: metricsPayload
           }
         ]
       }
     ]
   };
 
-    try {
-      console.log('Sending payload to Grafana...');
-      console.log('[Metrics] Payload preview:');
-      console.dir(body, { depth: null });
-      const res = await fetch(config.metrics.endpointUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${Buffer.from(`${config.metrics.accountId}:${config.metrics.apiKey}`).toString('base64')}`
-        },
-        body: JSON.stringify(body)
-      });
+  try {
+    console.log('Sending payload to Grafana...');
+    console.log('[Metrics] Payload preview:');
+    console.dir(body, { depth: null });
 
-      const text = await res.text();
-      console.log('Grafana response status:', res.status);
-      console.log('Grafana response body:', text);
+    const res = await fetch(config.metrics.endpointUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${Buffer.from(`${config.metrics.accountId}:${config.metrics.apiKey}`).toString('base64')}`
+      },
+      body: JSON.stringify(body)
+    });
 
-      if (res.ok) {
-        // reset counters on success
-        this.httpRequests = {};
-        this.authAttempts = { success: 0, failure: 0 };
-        this.pizzaPurchases = { success: 0, failure: 0, totalRevenue: 0 };
-      } else {
-        console.warn('Metrics not accepted by Grafana, counters not reset.');
-      }
-    } catch (err) {
-      console.error('Error sending metrics to Grafana:', err);
+    const text = await res.text();
+    console.log('Grafana response status:', res.status);
+    console.log('Grafana response body:', text);
+
+    if (res.ok) {
+      // Reset counters after successful send
+      this.httpRequests = {};
+      this.authAttempts = { success: 0, failure: 0 };
+      this.pizzaPurchases = { success: 0, failure: 0, totalRevenue: 0 };
+    } else {
+      console.warn('Metrics not accepted by Grafana, counters not reset.');
     }
+  } catch (err) {
+    console.error('Error sending metrics to Grafana:', err);
   }
+}
 
   // Start periodic reporting
-  startPeriodicReporting(interval = 5000) {
+  startPeriodicReporting(interval = 10000) {
     setInterval(this.sendToGrafana, interval);
   }
 }
