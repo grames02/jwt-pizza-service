@@ -165,7 +165,26 @@ class Metrics {
       }
     });
 
-    const body = { resourceMetrics: [{ scopeMetrics: [{ metrics }] }] };
+    const body = {
+    resourceMetrics: [
+      {
+        resource: {
+          attributes: [
+            {
+              key: "service.name",
+              value: { stringValue: config.metrics.source }
+            }
+          ]
+        },
+        scopeMetrics: [
+          {
+            scope: { name: "pizza-metrics" },
+            metrics: metrics
+          }
+        ]
+      }
+    ]
+  };
 
     try {
       console.log('Sending payload to Grafana...');
