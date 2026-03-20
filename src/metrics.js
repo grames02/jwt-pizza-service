@@ -21,11 +21,18 @@ class Metrics {
 
   // Track HTTP requests
   requestTracker(req, res, next) {
-    const method = req.method;
-    if (!this.httpRequests[method]) this.httpRequests[method] = 0;
-    this.httpRequests[method] += 1;
-    next();
-  }
+  const method = req.method;
+  if (!this.httpRequests[method]) this.httpRequests[method] = { count: 0, latency: [] };
+  this.httpRequests[method].count += 1;
+
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start; // milliseconds
+    this.httpRequests[method].latency.push(duration);
+  });
+
+  next();
+}
 
   // Track auth attempts
   recordAuth(success) {
@@ -92,15 +99,16 @@ class Metrics {
     const metrics = [];
 
     // HTTP requests
-    Object.entries(this.httpRequests).forEach(([method, count]) => {
+    // Latency per method
+    Object.entries(this.httpRequests).forEach(([method, data]) => {
+      if (!data.latency.length) return;
+      const avgLatency = data.latency.reduce((a,b) => a+b,0)/data.latency.length;
       metrics.push({
-        name: 'http_requests_total',
-        sum: {
+        name: 'http_latency_ms',
+        gauge: {
           dataPoints: [
-            { asInt: count, timeUnixNano: timestamp.toString(), attributes: formatAttributes({ method, source: config.metrics.source }) }
-          ],
-          aggregationTemporality: 'AGGREGATION_TEMPORALITY_CUMULATIVE',
-          isMonotonic: true,
+            { doubleValue: avgLatency, timeUnixNano: timestamp.toString(), attributes: formatAttributes({ method, source: config.metrics.source }) }
+          ]
         }
       });
     });
