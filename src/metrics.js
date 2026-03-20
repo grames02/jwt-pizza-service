@@ -114,13 +114,16 @@ class Metrics {
   ['success', 'failure'].forEach(outcome => {
     metricsPayload.push({
       name: 'auth_attempts_total',
-      unit: '%',
-      gauge: {
+      sum: {
         dataPoints: [
-          { doubleValue: parseFloat(this.getMemoryUsagePercentage()), timeUnixNano: timestamp.toString(), attributes: formatAttributes({ source: config.metrics.source }) }
+          {
+            asInt: this.authAttempts[outcome],
+            timeUnixNano: timestamp.toString(),
+            attributes: formatAttributes({ outcome, source: config.metrics.source })
+          }
         ],
         aggregationTemporality: 'AGGREGATION_TEMPORALITY_CUMULATIVE',
-        isMonotonic: true,
+        isMonotonic: true
       }
     });
   });
