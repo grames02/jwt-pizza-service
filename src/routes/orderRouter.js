@@ -1,4 +1,5 @@
 const express = require('express');
+const metrics = require('./metrics.js');
 const config = require('../config.js');
 const { Role, DB } = require('../database/database.js');
 const { authRouter } = require('./authRouter.js');
@@ -38,6 +39,9 @@ orderRouter.docs = [
     example: `curl -X POST localhost:3000/api/order -H 'Content-Type: application/json' -d '{"franchiseId": 1, "storeId":1, "items":[{ "menuId": 1, "description": "Veggie", "price": 0.05 }]}'  -H 'Authorization: Bearer tttttt'`,
     response: { order: { franchiseId: 1, storeId: 1, items: [{ menuId: 1, description: 'Veggie', price: 0.05 }], id: 1 }, jwt: '1111111111' },
   },
+
+  // This is my pizza purchase reference. Probably needs to be built out more.
+  app.use(metrics.pizzaPurchase)
 ];
 
 // getMenu

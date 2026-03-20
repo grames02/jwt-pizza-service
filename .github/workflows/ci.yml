@@ -35,7 +35,7 @@ jobs:
       - name: Lint
         run: npm run lint
       
-      
+
       - name: Write config file
         run: |
           echo "module.exports = {
@@ -61,6 +61,8 @@ jobs:
               accountId: '${{ secrets.METRICS_ACCOUNT_ID_KEY }}',
             },            
           };" > src/config.js
+      # With this section above, am I actually running my metrics file? Or why hasn't it been running whenever I push?
+      # Something for me to review...
 
       - name: set version
         id: set_version
