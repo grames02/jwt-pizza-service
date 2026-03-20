@@ -1,11 +1,9 @@
 const express = require('express');
-const metrics = require('./metrics.js');
 const config = require('../config.js');
 const { Role, DB } = require('../database/database.js');
 const { authRouter } = require('./authRouter.js');
 const { asyncHandler, StatusCodeError } = require('../endpointHelper.js');
 
-const app = express();
 const orderRouter = express.Router();
 
 orderRouter.docs = [
@@ -41,8 +39,6 @@ orderRouter.docs = [
     response: { order: { franchiseId: 1, storeId: 1, items: [{ menuId: 1, description: 'Veggie', price: 0.05 }], id: 1 }, jwt: '1111111111' },
   },
 
-  // This is my pizza purchase reference. Probably needs to be built out more.
-  app.use(metrics.pizzaPurchase)
 ];
 
 // getMenu
