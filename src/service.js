@@ -1,6 +1,7 @@
 const express = require('express');
 const { authRouter, setAuthUser } = require('./routes/authRouter.js');
 const orderRouter = require('./routes/orderRouter.js');
+const metrics = require('./metrics.js'); // adjust path if needed
 const franchiseRouter = require('./routes/franchiseRouter.js');
 const userRouter = require('./routes/userRouter.js');
 const version = require('./version.json');
@@ -15,7 +16,7 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   next();
 });
-// app.use(metrics.requestTracker);
+app.use(metrics.requestTracker);
 app.use(setAuthUser);
 
 const apiRouter = express.Router();

@@ -114,9 +114,10 @@ class Metrics {
   ['success', 'failure'].forEach(outcome => {
     metricsPayload.push({
       name: 'auth_attempts_total',
-      sum: {
+      unit: '%',
+      gauge: {
         dataPoints: [
-          { asInt: this.authAttempts[outcome], timeUnixNano: timestamp.toString(), attributes: formatAttributes({ outcome, source: config.metrics.source }) }
+          { doubleValue: parseFloat(this.getMemoryUsagePercentage()), timeUnixNano: timestamp.toString(), attributes: formatAttributes({ source: config.metrics.source }) }
         ],
         aggregationTemporality: 'AGGREGATION_TEMPORALITY_CUMULATIVE',
         isMonotonic: true,
@@ -161,7 +162,7 @@ class Metrics {
 
   // --- CPU usage ---
 metricsPayload.push({
-  name: 'cpu',
+  name: 'cpu_percent',
   unit: '%',
   gauge: {
     dataPoints: [
