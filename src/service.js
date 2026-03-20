@@ -1,5 +1,5 @@
 const express = require('express');
-const { authRouter } = require('./routes/authRouter.js');
+const { authRouter, setAuth } = require('./routes/authRouter.js');
 const orderRouter = require('./routes/orderRouter.js');
 const franchiseRouter = require('./routes/franchiseRouter.js');
 const userRouter = require('./routes/userRouter.js');
@@ -16,6 +16,7 @@ app.use((req, res, next) => {
   next();
 });
 // app.use(metrics.requestTracker);
+app.use(setAuthUser);
 
 const apiRouter = express.Router();
 app.use('/api', apiRouter);
