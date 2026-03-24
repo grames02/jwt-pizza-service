@@ -14,7 +14,8 @@
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.9.7",
-    "node-fetch": "^2.7.0"
+    "node-fetch": "^2.7.0",
+    "pizza-logger": "^1.0.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
