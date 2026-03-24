@@ -1,49 +1,64 @@
-import fetch from 'node-fetch';
-import asyncHandler from 'express-async-handler';
-import orderRouter from './routes/orderRouter.js';
-import authRouter from './routes/authRouter.js';
-import DB from './db.js';
+const config = require('./config');
+const fetch = require('node-fetch');
 
+class Logger {
+  httpLogger = (req, res, next) => {
+    let send = res.send;
+    res.send = (resBody) => {
+      const logData = {
+        authorized: !!req.headers.authorization,
+        path: req.originalUrl,
+        method: req.method,
+        statusCode: res.statusCode,
+        reqBody: JSON.stringify(req.body),
+        resBody: JSON.stringify(resBody),
+      };
+      const level = this.statusToLogLevel(res.statusCode);
+      this.log(level, 'http', logData);
+      res.send = send;
+      return res.send(resBody);
+    };
+    next();
+  };
 
-const Logger = require('pizza-logger');
-const config = require('./config.js');
+  log(level, type, logData) {
+    const labels = { component: config.source, level: level, type: type };
+    const values = [this.nowString(), this.sanitize(logData)];
+    const logEvent = { streams: [{ stream: labels, values: [values] }] };
 
-// Database Logger
-function sendLogToGrafana(event) {
+    this.sendLogToGrafana(logEvent);
+  }
+
+  statusToLogLevel(statusCode) {
+    if (statusCode >= 500) return 'error';
+    if (statusCode >= 400) return 'warn';
+    return 'info';
+  }
+
+  nowString() {
+    return (Math.floor(Date.now()) * 1000000).toString();
+  }
+
+  sanitize(logData) {
+    logData = JSON.stringify(logData);
+    return logData.replace(/\\"password\\":\s*\\"[^"]*\\"/g, '\\"password\\": \\"*****\\"');
+  }
+
+  sendLogToGrafana(event) {
     const body = JSON.stringify(event);
-    fetch(`${config.url}`, {
-        method: 'post',
-        body: body,
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${config.accountId}:${config.apiKey}`,
-        },
+    fetch(`${config.endpointUrl}`, {
+      method: 'post',
+      body: body,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.accountId}:${config.apiKey}`,
+      },
     }).then((res) => {
-        if (!res.ok) console.log('Failed to send log to Grafana');
+      if (!res.ok) console.log('Failed to send log to Grafana');
     });
+  }
+
 }
 
-// Unhandled Error Logger
-// class StatusCodeError extends Error {
-//     constructor(message, statusCode) {
-//         super(message);
-//         logger.unhandledErrorLogger(this);
-//         this.statusCode = statusCode;
-//     }
-// }
-
-// createOrder
-orderRouter.post(
-    '/',
-    authRouter.authenticateToken,
-    asyncHandler(async (req) => {
-        const orderReq = req.body;
-        const order = await DB.addDinerOrder(req.user, orderReq);
-        const orderInfo = { diner: { id: req.user.id, name: req.user.name, email: req.user.email }, order };
-        logger.factoryLogger(orderInfo);
-    })
-);
-
-const logger = new Logger(config);
-logger.sendLogToGrafana();
+const logger = new Logger();
 module.exports = logger;
