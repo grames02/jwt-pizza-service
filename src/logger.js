@@ -11,7 +11,7 @@ class Logger {
         method: req.method,
         statusCode: res.statusCode,
         reqBody: JSON.stringify(req.body),
-        resBody: JSON.stringify(resBody),
+        resBody: JSON.stringify(resBody).slice(0, 300),
       };
       const level = this.statusToLogLevel(res.statusCode);
       this.log(level, 'http', logData);
@@ -22,8 +22,17 @@ class Logger {
   };
 
   log(level, type, logData) {
-    const labels = { component: config.logging.source, level: level, type: type };
-    const values = [this.nowString(), this.sanitize(logData)];
+    const labels = {
+      component: config.logging.source,
+      level: level,
+      type: type,
+      method: logData.method,
+      path: logData.path,
+      statusCode: String(logData.statusCode),
+      authorized: String(logData.authorized),
+    };
+    const message = `${logData.method} ${logData.path} ${logData.statusCode}`;
+    const values = [this.nowString(), message];
     const logEvent = { streams: [{ stream: labels, values: [values] }] };
 
     this.sendLogToGrafana(logEvent);
