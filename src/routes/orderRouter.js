@@ -88,10 +88,11 @@ orderRouter.post(
     });
     const j = await r.json();
     if (r.ok) {
-      metrics.recordOrder();
+      metrics.pizzaPurchase(true);
       logger.factoryLogger({ diner: { id: req.user.id, name: req.user.name, email: req.user.email }, order });
       res.send({ order, followLinkToEndChaos: j.reportUrl, jwt: j.jwt });
     } else {
+      metrics.pizzaPurchase(false);
       res.status(500).send({ message: 'Failed to fulfill order at factory', followLinkToEndChaos: j.reportUrl });
     }
   })
