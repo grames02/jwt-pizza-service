@@ -11,6 +11,11 @@ class Logger {
     this.factoryLogger = this.logger.factoryLogger;
     this.unhandledErrorLogger = this.logger.unhandledErrorLogger;
   }
+
+  sanitize(logData) {
+    logData = JSON.stringify(logData);
+    return logData.replace(/\\"password\\":\s*\\"[^"]*\\"/g, '\\"password\\": \\"*****\\"');
+  }
 }
 
 module.exports = Logger;
