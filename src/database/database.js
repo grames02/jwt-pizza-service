@@ -4,7 +4,9 @@ const config = require('../config.js');
 const { StatusCodeError } = require('../endpointHelper.js');
 const { Role } = require('../model/model.js');
 const dbModel = require('./dbModel.js');
-const logger = require('../logger.js');
+const PizzaLogger = require('pizza-logger');
+const logger = new PizzaLogger(config.logging);
+
 
 class DB {
   constructor() {
@@ -295,26 +297,26 @@ class DB {
     return '';
   }
 
-  async query(connection, sql, params) {
-    // This was changed for deliverable 9. It adds logging for all database queries,
-    // including the query text, parameters, duration, and row count. It also logs errors
-    // if a query fails. This will help with debugging and monitoring database performance.
+ async query(connection, sql, params = []) {
+  const start = Date.now();
   try {
-    const start = Date.now();
     const [results] = await connection.execute(sql, params);
     const duration = Date.now() - start;
-    logger.log('info', 'db', {
+
+    // Log query
+    logger.dbLogger({
       query: sql,
-      params: params,
-      duration: duration,
-      rowCount: Array.isArray(results) ? results.length : undefined,
+      params,
+      durationMs: duration,
+      rows: results.length ?? 0,
     });
+
     return results;
   } catch (err) {
-    logger.log('error', 'db', {
+    logger.unhandledErrorLogger({
+      message: err.message,
       query: sql,
-      params: params,
-      error: err.message,
+      params,
     });
     throw err;
   }
