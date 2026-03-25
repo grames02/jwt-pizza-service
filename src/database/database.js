@@ -4,6 +4,8 @@ const config = require('../config.js');
 const { StatusCodeError } = require('../endpointHelper.js');
 const { Role } = require('../model/model.js');
 const dbModel = require('./dbModel.js');
+const logger = request('../logger.js');
+
 class DB {
   constructor() {
     this.initialized = this.initializeDatabase();
@@ -294,9 +296,29 @@ class DB {
   }
 
   async query(connection, sql, params) {
+    // This was changed for deliverable 9. It adds logging for all database queries,
+    // including the query text, parameters, duration, and row count. It also logs errors
+    // if a query fails. This will help with debugging and monitoring database performance.
+  try {
+    const start = Date.now();
     const [results] = await connection.execute(sql, params);
+    const duration = Date.now() - start;
+    logger.log('info', 'db', {
+      query: sql,
+      params: params,
+      duration: duration,
+      rowCount: Array.isArray(results) ? results.length : undefined,
+    });
     return results;
+  } catch (err) {
+    logger.log('error', 'db', {
+      query: sql,
+      params: params,
+      error: err.message,
+    });
+    throw err;
   }
+}
 
   async getID(connection, key, value, table) {
     const [rows] = await connection.execute(`SELECT id FROM ${table} WHERE ${key}=?`, [value]);
