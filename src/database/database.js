@@ -308,11 +308,6 @@ class DB {
     logger.dbLogger({query: sql});
     return results;
   } catch (err) {
-    logger.log('error', 'db', {
-      query: sql,
-      params: params,
-      error: err.message,
-    });
     throw err;
   }
 }
