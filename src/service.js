@@ -50,7 +50,7 @@ app.use('*', (req, res) => {
   });
 });
 
-app.use((err, req, res) => { 
+app.use((err, req, res, _next) => { 
   logger.unhandledErrorLogger({
     source: 'service',              // REQUIRED by pizza-logger
     error: err,
