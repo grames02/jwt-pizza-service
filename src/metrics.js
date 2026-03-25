@@ -202,8 +202,6 @@ metricsPayload.push({
       body: JSON.stringify(body)
     });
 
-    const text = await res.text();
-
     if (res.ok) {
       // Reset counters after successful send
       this.httpRequests = {};
