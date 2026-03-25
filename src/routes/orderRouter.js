@@ -1,5 +1,4 @@
 const express = require('express');
-const logger = require('../logger.js');
 const config = require('../config.js');
 const metrics = require('../metrics.js');
 const { Role, DB } = require('../database/database.js');
@@ -89,7 +88,6 @@ orderRouter.post(
     const j = await r.json();
     if (r.ok) {
       metrics.pizzaPurchase(true);
-      logger.factoryLogger({ diner: { id: req.user.id, name: req.user.name, email: req.user.email }, order });
       res.send({ order, followLinkToEndChaos: j.reportUrl, jwt: j.jwt });
     } else {
       metrics.pizzaPurchase(false);
