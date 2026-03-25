@@ -87,12 +87,12 @@ orderRouter.post(
       headers: { 'Content-Type': 'application/json', authorization: `Bearer ${config.factory.apiKey}` },
       body: JSON.stringify({ diner: { id: req.user.id, name: req.user.name, email: req.user.email }, order }),
     });
-    logger.factoryLogger(req.body);
+    // logger.factoryLogger(req.body);
     const j = await r.json();
     if (r.ok) {
       metrics.pizzaPurchase(true);
       res.send({ order, followLinkToEndChaos: j.reportUrl, jwt: j.jwt });
-      logger.factoryLogger(req.res);
+      // logger.factoryLogger(req.res);
     } else {
       metrics.pizzaPurchase(false);
       res.status(500).send({ message: 'Failed to fulfill order at factory', followLinkToEndChaos: j.reportUrl });
