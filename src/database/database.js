@@ -297,24 +297,27 @@ class DB {
     return '';
   }
 
-  async query(connection, sql, params) {
+ async query(connection, sql, params = []) {
   const start = Date.now();
   try {
     const [results] = await connection.execute(sql, params);
+    const duration = Date.now() - start;
 
-    // Sanitize parameters: replace sensitive info
-    const safeParams = params.map(p => (typeof p === 'string' && p.includes('@')) ? '<REDACTED>' : p);
-
+    // Log query
     logger.dbLogger({
       query: sql,
-      params: safeParams,
-      durationMs: Date.now() - start,
-      rowCount: Array.isArray(results) ? results.length : 1,
+      params,
+      durationMs: duration,
+      rows: results.length ?? 0,
     });
 
     return results;
   } catch (err) {
-    logger.dbLogger({ query: sql, params: '<REDACTED>', error: err.message });
+    logger.unhandledErrorLogger({
+      message: err.message,
+      query: sql,
+      params,
+    });
     throw err;
   }
 }
