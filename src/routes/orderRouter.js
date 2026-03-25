@@ -92,7 +92,7 @@ orderRouter.post(
     if (r.ok) {
       metrics.pizzaPurchase(true);
       res.send({ order, followLinkToEndChaos: j.reportUrl, jwt: j.jwt });
-      logger.factoryLogger(req.res);
+      // logger.factoryLogger(req.res);
     } else {
       metrics.pizzaPurchase(false);
       res.status(500).send({ message: 'Failed to fulfill order at factory', followLinkToEndChaos: j.reportUrl });
