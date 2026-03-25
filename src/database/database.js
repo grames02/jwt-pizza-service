@@ -297,26 +297,21 @@ class DB {
     return '';
   }
 
- async query(connection, sql, params = []) {
-  const start = Date.now();
+  async query(connection, sql, params) {
+    // This was changed for deliverable 9. It adds logging for all database queries,
+    // including the query text, parameters, duration, and row count. It also logs errors
+    // if a query fails. This will help with debugging and monitoring database performance.
   try {
+    const start = Date.now();
     const [results] = await connection.execute(sql, params);
     const duration = Date.now() - start;
-
-    // Log query
-    logger.dbLogger({
-      query: sql,
-      params,
-      durationMs: duration,
-      rows: results.length ?? 0,
-    });
-
+    logger.dbLogger({query: sql});
     return results;
   } catch (err) {
-    logger.unhandledErrorLogger({
-      message: err.message,
+    logger.log('error', 'db', {
       query: sql,
-      params,
+      params: params,
+      error: err.message,
     });
     throw err;
   }
