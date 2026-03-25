@@ -4,7 +4,7 @@ class Logger {
   constructor(loggingConfig) {
     // Initialize pizza-logger with your Grafana config
     this.logger = new PizzaLogger(loggingConfig);
-    
+
     // Expose middleware & helpers
     this.httpLogger = this.logger.httpLogger;
     this.dbLogger = this.logger.dbLogger;
@@ -92,4 +92,3 @@ module.exports = Logger;
 // }
 
 // const logger = new Logger();
-// module.exports = logger;
