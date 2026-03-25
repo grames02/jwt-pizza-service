@@ -26,6 +26,7 @@ class Metrics {
   });
 
   next();
+  
 }
 
   // Track auth attempts
