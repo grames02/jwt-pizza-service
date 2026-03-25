@@ -1,18 +1,20 @@
+const PizzaLogger = require('@pizza/logger');
+
 class Logger {
   constructor(loggingConfig) {
     this.logger = new PizzaLogger(loggingConfig);
 
-    // wrap httpLogger to avoid undefined resBody crashes
+    // Wrap httpLogger to avoid undefined resBody crashes
     this.httpLogger = (req, res, next) => {
-      const originalSend = res.send;
+      const originalSend = res.send.bind(res);
       res.send = (body) => {
         try {
-          // ensure resBody is always a string or object
+          // Ensure resBody is always a string or object
           this.logger.httpLogger(req, res, body ?? '');
         } catch (err) {
           console.error('PizzaLogger error:', err);
         }
-        return originalSend.call(res, body);
+        return originalSend(body);
       };
       next();
     };
