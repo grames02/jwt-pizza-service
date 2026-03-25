@@ -49,8 +49,8 @@ app.use('*', (req, res) => {
     message: 'unknown endpoint',
   });
 });
-
-app.use((err, req, res, _next) => { 
+// esline-disable-next-line no-unused-vars
+app.use((err, req, res, next) => { 
   logger.unhandledErrorLogger({
     source: 'service',              // REQUIRED by pizza-logger
     error: err,
