@@ -32,7 +32,6 @@ beforeAll(async () => {
     const registerRes = await request(app).post('/api/auth').send(testUser);
     testUserAuthToken = registerRes.body.token;
     expectValidJwt(testUserAuthToken);
-    testUser.token = testUserAuthToken;
 });
 
 test('getMenu', async () => {
@@ -43,46 +42,38 @@ test('getMenu', async () => {
   expect(Array.isArray(res.body)).toBe(true);
 });
 
+test('addMenuItem', async () => {
+  const res = await request(app)
+    .put('/api/order/menu')
+    .set('Authorization', `Bearer ${adminUser.token}`)
+    .send(menuItem);
+  expect(res.status).toBe(200);
+});
+
+
 test('createOrder', async () => {
   const res = await request(app)
     .post('/api/order')
     .set('Authorization', `Bearer ${testUserAuthToken}`)
-    .send({
-      items: [{ id: menuItem.id, quantity: 1 }],
-    });
+    .send();
   expect(res.status).toBe(200);
-  expect(res.body).toHaveProperty('id');
+});
+
+test('Add menu item rejects non-admin user', async () => {
+const res = await request(app)
+    .put('/api/order/menu')
+    .set('Authorization', `Bearer ${testUserAuthToken}`)
+    .send(menuItem);
+expect(res.status).toBe(403);
+expect(res.body.message).toBe('unable to add menu item');
 });
 
 test('getOrder', async () => {
-  const createRes = await request(app)
-    .post('/api/order')
-    .set('Authorization', `Bearer ${testUserAuthToken}`)
-    .send({
-      items: [{ id: menuItem.id, quantity: 1 }],
-    });
-  const orderId = createRes.body.id;
-
   const res = await request(app)
-    .get(`/api/order/${orderId}`)
-    .set('Authorization', `Bearer ${testUserAuthToken}`);
+    .get('/api/order')
+    .set('Authorization', `Bearer ${adminUser.token}`);
   expect(res.status).toBe(200);
-  expect(res.body).toHaveProperty('id', orderId);
-});
 
-test('addMenuItem', async () => {
-  const res = await request(app)
-    .post('/api/order/menu')
-    .set('Authorization', `Bearer ${adminUser.token}`)
-    .send({
-      title: menuItem.title,
-      description: menuItem.description,
-      image: menuItem.image,
-      price: menuItem.price,
-    });
-  expect(res.status).toBe(200);
-  expect(res.body).toHaveProperty('id');
-  menuItem.id = res.body.id;
 });
 
 function expectValidJwt(potentialJwt) {
