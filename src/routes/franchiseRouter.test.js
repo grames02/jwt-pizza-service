@@ -71,7 +71,7 @@ test('Unable to make franchise, not admin', async () => {
 
 test('get user franchises', async () => {
   const response = await request(app)
-    .get(`/api/franchise/${franchiseId}`)
+    .get(`/api/franchise/${adminUser.token}`)
     .set('Authorization', `Bearer ${adminUser.token}`);
   expect(response.status).toBe(200);
 });

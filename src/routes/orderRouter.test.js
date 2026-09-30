@@ -55,8 +55,16 @@ test('createOrder', async () => {
   const res = await request(app)
     .post('/api/order')
     .set('Authorization', `Bearer ${testUserAuthToken}`)
-    .send();
+    .send({franchiseId: 1, storeId: 1, items: [{ menuId: 1, description: menuItem.description, price: menuItem.price }] });
   expect(res.status).toBe(200);
+});
+
+test('createBadOrder', async () => {
+  const res = await request(app)
+    .post('/api/order')
+    .set('Authorization', `Bearer ${testUserAuthToken}`)
+    .send({franchiseId: 1, storeId: 1, items: [{ menuId: 9999, description: 'Non-existent item', price: 9.99 }] });
+  expect(res.status).toBe(500);
 });
 
 test('Add menu item rejects non-admin user', async () => {
