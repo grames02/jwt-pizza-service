@@ -21,21 +21,21 @@ jobs:
           - '3306:3306'
         options: >-
           --health-cmd "mysqladmin ping -ptempdbpassword" --health-interval 10s --health-start-period 10s --health-timeout 5s --health-retries 10
+
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '22.x'
+          node-version: '24.x'
 
       - name: Install dependencies
         run: npm ci
 
       - name: Lint
         run: npm run lint
-
 
       - name: Write config file
         run: |
@@ -60,7 +60,6 @@ jobs:
       - name: Tests
         run: npm test
 
-
       - name: set version
         id: set_version
         run: |
@@ -68,7 +67,6 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           printf '{"version": "%s" }' "$version" > src/version.json
 
-    
       - name: Update coverage
         run: |
           coverage=$(jq '.total.lines.pct' coverage/coverage-summary.json)
