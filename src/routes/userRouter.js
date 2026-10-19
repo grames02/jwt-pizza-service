@@ -23,6 +23,7 @@ userRouter.docs = [
       ],
     },
   },
+
   {
     method: "GET",
     path: "/api/user/me",
@@ -86,7 +87,27 @@ userRouter.get(
   "/",
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
-    res.json({});
+    if (!req.user.isRole(Role.Admin)) {
+      return res.status(403).json({ message: "unauthorized" });
+    }
+
+    const page = Number(req.query.page ?? 1);
+    const limit = Number(req.query.limit ?? 10);
+    const name = String(req.query.name ?? "*");
+
+    if (
+      !Number.isInteger(page) ||
+      page < 1 ||
+      !Number.isInteger(limit) ||
+      limit < 1 ||
+      limit > 100
+    ) {
+      return res.status(400).json({ message: "invalid pagination" });
+    }
+
+    const result = await DB.getUsers(page, limit, name);
+
+    res.json(result);
   }),
 );
 
@@ -95,16 +116,25 @@ userRouter.delete(
   "/:userId",
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
-    res.json({ message: "not implemented" });
-  }),
-);
+    if (!req.user.isRole(Role.Admin)) {
+      return res.status(403).json({ message: "unauthorized" });
+    }
 
-// listUsers
-userRouter.get(
-  "/",
-  authRouter.authenticateToken,
-  asyncHandler(async (req, res) => {
-    res.json({ message: "not implemented", users: [], more: false });
+    const userId = Number(req.params.userId);
+
+    if (!Number.isInteger(userId) || userId < 1) {
+      return res.status(400).json({ message: "invalid user id" });
+    }
+
+    if (req.user.id === userId) {
+      return res.status(400).json({
+        message: "cannot delete your own account",
+      });
+    }
+
+    await DB.deleteUser(userId);
+
+    res.json({ message: "user deleted" });
   }),
 );
 
