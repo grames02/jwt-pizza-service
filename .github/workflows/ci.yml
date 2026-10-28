@@ -76,7 +76,7 @@ jobs:
       - name: Create dist
         run: |
           mkdir dist
-          cp DockerFile dist
+          cp Dockerfile dist
           cp -r src/* dist
           cp *.json dist
           sed -i "s/root/${{ secrets.DB_USERNAME }}/g" dist/config.js
