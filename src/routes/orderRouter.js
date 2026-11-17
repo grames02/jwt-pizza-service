@@ -133,6 +133,7 @@ orderRouter.post(
       }),
     });
     const j = await r.json();
+    const latency = Date.now() - start;
     if (r.ok) {
       metrics.pizzaPurchase(true, latency, price, order.items.length);
       res.send({ order, followLinkToEndChaos: j.reportUrl, jwt: j.jwt });
